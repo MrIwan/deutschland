@@ -10,6 +10,10 @@ from bs4 import BeautifulSoup
 
 from deutschland.config import Config, module_config
 
+import time
+
+import random
+
 
 class Report:
     __slots__ = ["date", "name", "content_url", "company", "report", "raw_report"]
@@ -81,11 +85,11 @@ class Bundesanzeiger:
 
         return prediction_str
 
-    def __is_captcha_needed(self, entry_content: str):
+    def __is_captcha_needed(self, entry_content: str, year: int = None):
         soup = BeautifulSoup(entry_content, "html.parser")
         return not bool(soup.find("div", {"class": "publication_container"}))
 
-    def __find_all_entries_on_page(self, page_content: str):
+    def __find_all_entries_on_page(self, page_content: str, year: int = None):
         soup = BeautifulSoup(page_content, "html.parser")
         wrapper = soup.find("div", {"class": "result_container"})
         rows = wrapper.find_all("div", {"class": "row"})
@@ -113,12 +117,16 @@ class Bundesanzeiger:
 
             company_name = company_name_element.contents[0].strip()
 
-            yield Report(date, entry_name, entry_link, company_name)
+            print(f"date: {type(year)}, {type(date.year)}, {date.year}, {year}")
+            if year is not None and date.year == year:
+                print(f"Found entry for year {year}: {entry_name} ({date})")
+                yield Report(date, entry_name, entry_link, company_name)
 
-    def __generate_result_for_page(self, content: str):
+    def __generate_result_for_page(self, content: str, year: int = None):
         """iterate trough all results and try to fetch single reports"""
         result = {}
-        for element in self.__find_all_entries_on_page(content):
+        for element in self.__find_all_entries_on_page(content, year=year):
+            time.sleep(random.uniform(1.0, 1.5))  # be nice to the server and avoid sending too many requests in a short time
             get_element_response = self.__get_response(element.content_url)
 
             if self.__is_captcha_needed(get_element_response.text):
@@ -129,6 +137,7 @@ class Bundesanzeiger:
                 img_response = self.__get_response(captcha_image_src)
                 captcha_result = self.captcha_callback(img_response.content)
                 captcha_endpoint_url = soup.find_all("form")[1]["action"]
+                time.sleep(random.uniform(1.0, 1.5))  # be nice to the server and avoid sending too many requests in a short time
                 get_element_response = self.session.post(
                     captcha_endpoint_url,
                     data={"solution": captcha_result, "confirm-button": "OK"},
@@ -168,12 +177,13 @@ class Bundesanzeiger:
 
         return next_link.attrs.get("href")
 
-    def __generate_result(self, url: str, page_limit: int):
+    def __generate_result(self, url: str, page_limit: int, year: int = None):
         results = dict()
         pages = 0
         while url is not None and pages < page_limit:
             content = self.__get_response(url)
-            result_for_page = self.__generate_result_for_page(content.text)
+            print(f'Fetching page {pages + 1} with URL: {url}')
+            result_for_page = self.__generate_result_for_page(content.text, year=year)
             results.update(**result_for_page)
             url = self.__get_next_page_link(content.text)
             pages += 1
@@ -189,7 +199,7 @@ class Bundesanzeiger:
 
         return response
 
-    def get_reports(self, company_name: str, *, page_limit=1):
+    def get_reports(self, company_name: str, *, page_limit=1, year: int = None):
         """
         fetch all reports for this company name
         :param company_name:
@@ -224,7 +234,7 @@ class Bundesanzeiger:
         response = self.__get_response("https://www.bundesanzeiger.de/pub/de/start?0")
         # perform the search
         search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&search_button=Suchen"
-        return self.__generate_result(search_url, page_limit)
+        return self.__generate_result(search_url, page_limit, year)
 
 
 if __name__ == "__main__":
