@@ -252,7 +252,7 @@ class Bundesanzeiger:
         # go to the start page
         response = self.__get_response("https://www.bundesanzeiger.de/pub/de/start?0")
         # perform the search
-        search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&search_button=Suchen"
+        search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&hitsperpage-select=argus-HitsPerPage100&search_button=Suchen"
         return self.__generate_result(search_url, page_limit, year)
 
 
