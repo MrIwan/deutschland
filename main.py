@@ -11,7 +11,7 @@ def main():
     logging.getLogger("deutschland.bundesanzeiger.bundesanzeiger").setLevel(logging.DEBUG)
 
     ba = Bundesanzeiger()
-    reports = ba.get_reports("deepwood GmbH", page_limit=1, year=2023)
+    reports = ba.get_reports("deepwood GmbH", page_limit=1, year=2021)
     print("Reports:", len(reports))
 
 if __name__ == "__main__":

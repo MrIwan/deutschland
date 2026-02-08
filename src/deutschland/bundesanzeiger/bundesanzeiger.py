@@ -13,6 +13,21 @@ from deutschland.config import Config, module_config
 import time
 
 import random
+import re
+
+def check_if_geschaeftsjahr(text: str, year: int) -> bool:
+    """
+    return Trie if it is likely a jahresabschluss
+    """
+    keywords = r"(jahresabschluss|abschlussbericht|jahresbericht|jahresbilanz|geschäftsbericht)"
+    year_part = rf"(?:\b{year}\b|\b\d{{2}}\.\d{{2}}\.{year}\b)"
+
+    pattern = re.compile(
+        rf"(?i){keywords}.*?{year_part}",
+        re.DOTALL,
+    )
+
+    return pattern.search(text) is not None
 
 
 class Report:
@@ -118,8 +133,12 @@ class Bundesanzeiger:
             company_name = company_name_element.contents[0].strip()
 
             print(f"date: {type(year)}, {type(date.year)}, {date.year}, {year}")
-            if year is not None and date.year == year:
-                print(f"Found entry for year {year}: {entry_name} ({date})")
+
+            if date.year < year:
+                print(f"Reached entry from year {date.year}, stopping iteration.")
+                break
+            if year is not None and check_if_geschaeftsjahr(entry_name, year):
+                print(f"Entry Name: {entry_name}, Link: {entry_link}, Date: {date}, Company: {company_name}")
                 yield Report(date, entry_name, entry_link, company_name)
 
     def __generate_result_for_page(self, content: str, year: int = None):
