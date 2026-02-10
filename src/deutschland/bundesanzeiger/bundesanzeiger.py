@@ -141,6 +141,8 @@ class Bundesanzeiger:
             if year is not None and check_if_geschaeftsjahr(entry_name, year):
                 self.logger.info(f"Found a report for {company_name} that is likely a Jahresabschluss for {year}: '{entry_name}'")
                 yield Report(date, entry_name, entry_link, company_name)
+            else:
+                yield Report(date, entry_name, entry_link, company_name)
 
     def __generate_result_for_page(self, content: str, year: int = None):
         """iterate trough all results and try to fetch single reports"""
@@ -198,13 +200,15 @@ class Bundesanzeiger:
 
         return next_link.attrs.get("href")
 
-    def __generate_result(self, url: str, page_limit: int, year: int = None):
+    def __generate_result(self, url: str, page_limit: int, year: int = None, max_reports: int = None):
         results = dict()
         pages = 0
         while url is not None and pages < page_limit:
             content = self.__get_response(url)
             result_for_page = self.__generate_result_for_page(content.text, year=year)
             results.update(**result_for_page)
+            if max_reports is not None and len(results) >= max_reports:
+                break
             url = self.__get_next_page_link(content.text)
             pages += 1
         return results
@@ -219,7 +223,7 @@ class Bundesanzeiger:
 
         return response
 
-    def get_reports(self, company_name: str, *, page_limit=1, year: int = None):
+    def get_reports(self, company_name: str, *, page_limit=1, year: int = None, max_reports: int = None):
         """
         fetch all reports for this company name
         :param company_name:
@@ -254,7 +258,7 @@ class Bundesanzeiger:
         response = self.__get_response("https://www.bundesanzeiger.de/pub/de/start?0")
         # perform the search
         search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&search_button=Suchen"
-        return self.__generate_result(search_url, page_limit, year)
+        return self.__generate_result(search_url, page_limit, year, max_reports)
 
 
 if __name__ == "__main__":

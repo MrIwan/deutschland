@@ -11,7 +11,7 @@ def main():
     logging.getLogger("deutschland.bundesanzeiger.bundesanzeiger").setLevel(logging.DEBUG)
 
     ba = Bundesanzeiger()
-    reports = ba.get_reports("Sparkasse Wuppertal", page_limit=float("inf"), year=2021)
+    reports = ba.get_reports("Sparkasse Wuppertal", page_limit=float("inf"), year=2021, max_reports=3)
     print("Reports:", len(reports))
 
     text = ""
