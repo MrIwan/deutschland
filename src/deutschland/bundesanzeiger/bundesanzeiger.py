@@ -15,6 +15,8 @@ import time
 import random
 import re
 
+import logging
+
 def check_if_geschaeftsjahr(text: str, year: int) -> bool:
     """
     return Trie if it is likely a jahresabschluss
@@ -69,7 +71,7 @@ class Report:
 
 
 class Bundesanzeiger:
-    __slots__ = ["session", "model", "captcha_callback", "_config"]
+    __slots__ = ["session", "model", "captcha_callback", "_config", "logger"]
 
     def __init__(self, on_captach_callback=None, config: Config = None):
         if config is None:
@@ -87,6 +89,8 @@ class Bundesanzeiger:
 
             self.model = deutschland.bundesanzeiger.model.load_model()
             self.captcha_callback = self.__solve_captcha
+
+        self.logger = logging.getLogger(__name__)
 
     def __solve_captcha(self, image_data: bytes):
         import deutschland.bundesanzeiger.model
@@ -132,20 +136,17 @@ class Bundesanzeiger:
 
             company_name = company_name_element.contents[0].strip()
 
-            print(f"date: {type(year)}, {type(date.year)}, {date.year}, {year}")
-
             if date.year < year:
-                print(f"Reached entry from year {date.year}, stopping iteration.")
                 break
             if year is not None and check_if_geschaeftsjahr(entry_name, year):
-                print(f"Entry Name: {entry_name}, Link: {entry_link}, Date: {date}, Company: {company_name}")
+                self.logger.info(f"Found a report for {company_name} that is likely a Jahresabschluss for {year}: '{entry_name}'")
                 yield Report(date, entry_name, entry_link, company_name)
 
     def __generate_result_for_page(self, content: str, year: int = None):
         """iterate trough all results and try to fetch single reports"""
         result = {}
         for element in self.__find_all_entries_on_page(content, year=year):
-            time.sleep(random.uniform(1.0, 1.5))  # be nice to the server and avoid sending too many requests in a short time
+            time.sleep(random.uniform(2, 2.5))  # be nice to the server and avoid sending too many requests in a short time
             get_element_response = self.__get_response(element.content_url)
 
             if self.__is_captcha_needed(get_element_response.text):
@@ -189,6 +190,7 @@ class Bundesanzeiger:
         except ValueError:
             return None
 
+        time.sleep(random.uniform(1.0, 1.5))  # be nice to the server and avoid sending too many requests in a short time
         next_index = active_index + 1
         next_link = soup.select_one(f'div.page-item a[title="Zur Seite {next_index}"]')
         if not next_link:
@@ -201,7 +203,6 @@ class Bundesanzeiger:
         pages = 0
         while url is not None and pages < page_limit:
             content = self.__get_response(url)
-            print(f'Fetching page {pages + 1} with URL: {url}')
             result_for_page = self.__generate_result_for_page(content.text, year=year)
             results.update(**result_for_page)
             url = self.__get_next_page_link(content.text)
@@ -252,7 +253,7 @@ class Bundesanzeiger:
         # go to the start page
         response = self.__get_response("https://www.bundesanzeiger.de/pub/de/start?0")
         # perform the search
-        search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&hitsperpage-select=argus-HitsPerPage100&search_button=Suchen"
+        search_url = f"https://www.bundesanzeiger.de/pub/de/start?0-2.-top%7Econtent%7Epanel-left%7Ecard-form=&fulltext={quote_plus(company_name)}&area_select=&search_button=Suchen"
         return self.__generate_result(search_url, page_limit, year)
 
 
